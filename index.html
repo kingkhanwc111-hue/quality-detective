@@ -280,28 +280,45 @@
     $('leaderboard-note').textContent='อันดับรวมจาก Google Sheets';
   }
   function loadLeaderboard(){
-    $('leaderboard-note').textContent='กำลังโหลดอันดับจากระบบกลาง…';
-    const callbackName='qdLeaderboardCallback_'+Date.now();
+    const note=$('leaderboard-note');
+    note.textContent='กำลังโหลดอันดับจากระบบกลาง…';
+    const callbackName='qdLeaderboardCallback';
+    let script=document.createElement('script');
+    let finished=false;
+    const timeoutId=setTimeout(()=>{
+      if(finished)return;
+      finished=true;
+      delete window[callbackName];
+      script.remove();
+      note.textContent='หมดเวลารอข้อมูลอันดับ กรุณากดรีเฟรชอีกครั้ง';
+    },12000);
+
     window[callbackName]=data=>{
+      if(finished)return;
+      finished=true;
+      clearTimeout(timeoutId);
       try{
-        if(data && data.success===false) throw new Error(data.message||'Apps Script แจ้งข้อผิดพลาด');
+        if(!data || data.success===false) throw new Error(data?.message||'ระบบกลางไม่ส่งข้อมูล');
         remoteLeaderboard=Array.isArray(data)?data:(data.leaderboard||data.data||data.results||[]);
         renderLeaderboard();
-        if(!remoteLeaderboard.length)$('leaderboard-note').textContent='ยังไม่มีคะแนนใน Google Sheets';
+        if(!remoteLeaderboard.length) note.textContent='ยังไม่มีคะแนนใน Google Sheets';
       }catch(error){
-        $('leaderboard-note').textContent='อ่านอันดับไม่สำเร็จ: '+(error.message||'ตรวจสอบ Apps Script');
+        note.textContent='อ่านอันดับไม่สำเร็จ: '+(error.message||'ตรวจสอบ Apps Script');
       }finally{
         delete window[callbackName];
         script.remove();
       }
     };
-    const script=document.createElement('script');
-    script.src=APPS_SCRIPT_URL+'?callback='+encodeURIComponent(callbackName)+'&_='+Date.now();
+
     script.onerror=()=>{
-      $('leaderboard-note').textContent='โหลดอันดับไม่สำเร็จ กรุณาตรวจสอบการเผยแพร่ Web App';
+      if(finished)return;
+      finished=true;
+      clearTimeout(timeoutId);
       delete window[callbackName];
       script.remove();
+      note.textContent='โหลดอันดับไม่สำเร็จ กรุณาตรวจสอบการเชื่อมต่อ';
     };
+    script.src=APPS_SCRIPT_URL+'?callback='+callbackName+'&_='+Date.now();
     document.head.appendChild(script);
   }
   function storeLocalResult(){
