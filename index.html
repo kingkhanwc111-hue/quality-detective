@@ -271,7 +271,7 @@
       .filter(r=>r.employee_id!=='')
       .sort((a,b)=>a.time_elapsed-b.time_elapsed || b.score-a.score).slice(0,100);
     if(!rows.length){
-      body.innerHTML='<tr><td colspan="4" class="p-3 border text-center">ยังไม่มีข้อมูลจากระบบกลาง</td></tr>';
+      body.innerHTML='<tr><td colspan="4" class="p-3 border text-center">ยังไม่มีข้อมูลอันดับจาก Google Sheets</td></tr>';
       return;
     }
     body.innerHTML=rows.map((r,i)=>
@@ -333,7 +333,7 @@
     $('final-risks').textContent=risksFound+'/7';
     $('final-time').textContent=timeText(remaining);
     $('rank-description').textContent = 'คุณตรวจพบจุดผิดปกติได้ ' + risksFound + ' จาก 7 จุด';
-    storeLocalResult();show('summary');saveResult();
+    storeLocalResult();show('summary');loadLeaderboard();saveResult();
   }
   $('player-form').addEventListener('submit',event=>{
     event.preventDefault();
