@@ -115,7 +115,8 @@
     <p id="save-status" role="status" aria-live="polite" class="mt-4 text-sm text-stone-700 min-h-6"></p>
     <div class="mt-7 text-left">
       <h3 class="text-xl font-extrabold text-stone-800">🏆 อันดับผู้เล่นที่ใช้เวลาน้อยที่สุด</h3>
-      <p class="text-sm text-stone-600 mt-1">เรียงตามเวลาที่ใช้น้อยที่สุดก่อน หากเวลาเท่ากันจะเรียงตามคะแนนมากกว่า</p>
+      <p class="text-sm text-stone-600 mt-1">อันดับรวมของผู้เล่นทุกคน เรียงตามเวลาน้อยที่สุดก่อน หากเวลาเท่ากันจะเรียงตามคะแนนมากกว่า</p>
+      <button id="refresh-leaderboard-button" type="button" class="secondary mt-3">🔄 รีเฟรชอันดับล่าสุด</button>
       <div class="overflow-x-auto mt-3">
         <table class="w-full text-sm text-left border-collapse">
           <thead><tr class="bg-red-50"><th class="p-2 border">อันดับ</th><th class="p-2 border">รหัสพนักงาน</th><th class="p-2 border">เวลา</th><th class="p-2 border">คะแนน</th></tr></thead>
@@ -268,7 +269,7 @@
     const body=$('leaderboard-body');
     const rows=remoteLeaderboard.map(normalizeLeaderboardRow)
       .filter(r=>r.employee_id!=='')
-      .sort((a,b)=>a.time_elapsed-b.time_elapsed || b.score-a.score).slice(0,10);
+      .sort((a,b)=>a.time_elapsed-b.time_elapsed || b.score-a.score).slice(0,100);
     if(!rows.length){
       body.innerHTML='<tr><td colspan="4" class="p-3 border text-center">ยังไม่มีข้อมูลจากระบบกลาง</td></tr>';
       return;
@@ -283,11 +284,12 @@
     const callbackName='qdLeaderboardCallback_'+Date.now();
     window[callbackName]=data=>{
       try{
+        if(data && data.success===false) throw new Error(data.message||'Apps Script แจ้งข้อผิดพลาด');
         remoteLeaderboard=Array.isArray(data)?data:(data.leaderboard||data.data||data.results||[]);
         renderLeaderboard();
         if(!remoteLeaderboard.length)$('leaderboard-note').textContent='ยังไม่มีคะแนนใน Google Sheets';
-      }catch(_){
-        $('leaderboard-note').textContent='อ่านข้อมูลอันดับไม่สำเร็จ โปรดตรวจสอบรูปแบบข้อมูลจาก Apps Script';
+      }catch(error){
+        $('leaderboard-note').textContent='อ่านอันดับไม่สำเร็จ: '+(error.message||'ตรวจสอบ Apps Script');
       }finally{
         delete window[callbackName];
         script.remove();
@@ -351,6 +353,7 @@
   $('next-button').addEventListener('click',()=>{if(sceneIndex===1)finish();else{sceneIndex++;loadScene()}});
   $('export-button').addEventListener('click',exportResultsCSV);
   $('export-leaderboard-button').addEventListener('click',exportLeaderboardCSV);
+  $('refresh-leaderboard-button').addEventListener('click',loadLeaderboard);
   $('replay-button').addEventListener('click',start);
   $('restart-button').addEventListener('click',()=>{
     stopTimer();playing=false;player=null;
