@@ -122,7 +122,7 @@
           <tbody id="leaderboard-body"><tr><td colspan="4" class="p-3 border text-center">ยังไม่มีข้อมูล</td></tr></tbody>
         </table>
       </div>
-      <p id="leaderboard-note" class="text-xs text-stone-500 mt-2">อันดับนี้เก็บในเบราว์เซอร์เครื่องนี้</p>
+      <p id="leaderboard-note" class="text-xs text-stone-500 mt-2">อันดับรวมจาก Google Sheets</p>
     </div>
     <div class="flex flex-col sm:flex-row gap-3 mt-5">
       <button id="export-button" type="button" class="canva-button primary flex-1">ดาวน์โหลดผลคะแนนของฉัน (CSV)</button>
@@ -134,6 +134,8 @@
 </section>
   </main>
   <script>
+  const APPS_SCRIPT_URL='https://script.google.com/macros/s/AKfycbwmg3gBi4tjx-iUC0hvDr6wKTPw2ZdAip0X9VXxXx_6YaLDZSe-9piRwQkZ_WLBsTjQ/exec';
+  let remoteLeaderboard=[];
   const scenes=[
     {title:'ด่าน 1 · ด่านตรวจสอบกล่องเครื่องปรับอากาศ',points:[
       {a:[13,73],b:[13,73],label:'กล่องยับหรือกล่องมีรอยเสียหายบริเวณด้านซ้าย'},
@@ -215,16 +217,19 @@
   }
   async function saveResult(){
     const status=$('save-status');
-    status.textContent='กำลังบันทึกผลการเล่น…';
-    if(!sdkReady){status.textContent='';return}
+    status.textContent='กำลังส่งผลคะแนนไปยังระบบกลาง…';
+    const payload={employeeId:player.employee_id,score:score,timeSeconds:remaining,rank:$('result-level').textContent};
     try{
-      const result=await window.dataSdk.create({
-        employee_id:player.employee_id,full_name:player.full_name,department:player.department,
-        score,risks_found:risksFound,time_elapsed:remaining,
-        result_level:$('result-level').textContent,played_at:new Date().toISOString()
+      await fetch(APPS_SCRIPT_URL,{
+        method:'POST',mode:'no-cors',
+        headers:{'Content-Type':'text/plain;charset=utf-8'},
+        body:JSON.stringify(payload)
       });
-      status.textContent=result.isOk?'บันทึกผลลง Canva Sheet แล้ว':'ไม่สามารถยืนยันการบันทึกได้ โปรดตรวจสอบผลใน Canva Sheet ก่อนเล่นอีกครั้ง';
-    }catch(_){status.textContent='ไม่สามารถยืนยันการบันทึกได้ โปรดตรวจสอบผลใน Canva Sheet ก่อนเล่นอีกครั้ง'}
+      status.textContent='ส่งคำขอบันทึกคะแนนแล้ว กำลังโหลดอันดับจากระบบกลาง…';
+      setTimeout(loadLeaderboard,1500);
+    }catch(_){
+      status.textContent='ส่งคะแนนไม่สำเร็จ กรุณาตรวจสอบอินเทอร์เน็ต';
+    }
   }
 
   function exportResultsCSV(){
@@ -250,30 +255,69 @@
     a.remove();
     URL.revokeObjectURL(url);
   }
-  const LEADERBOARD_KEY = 'quality_detective_leaderboard_v1';
-  function getLeaderboard(){
-    try { const data=JSON.parse(localStorage.getItem(LEADERBOARD_KEY)||'[]'); return Array.isArray(data)?data:[]; }
-    catch(_){ return []; }
+  function normalizeLeaderboardRow(r){
+    return {
+      employee_id:r.employee_id ?? r.employeeId ?? r['Employee ID'] ?? '',
+      score:Number(r.score ?? r.Score ?? 0),
+      time_elapsed:Number(r.time_elapsed ?? r.timeSeconds ?? r['Time (Seconds)'] ?? r.time ?? 0),
+      result_level:r.result_level ?? r.rank ?? r.Rank ?? '',
+      played_at:r.played_at ?? r.date ?? r.Date ?? ''
+    };
   }
   function renderLeaderboard(){
     const body=$('leaderboard-body');
-    const rows=getLeaderboard().sort((a,b)=>a.time_elapsed-b.time_elapsed || b.score-a.score || String(a.played_at).localeCompare(String(b.played_at))).slice(0,10);
-    if(!rows.length){body.innerHTML='<tr><td colspan="4" class="p-3 border text-center">ยังไม่มีข้อมูล</td></tr>';return;}
-    body.innerHTML=rows.map((r,i)=>'<tr class="'+(r.employee_id===player?.employee_id && r.played_at===window._qdCurrentPlayedAt?'bg-yellow-50':'')+'"><td class="p-2 border font-bold">'+(i+1)+'</td><td class="p-2 border">'+escapeHTML(r.employee_id)+'</td><td class="p-2 border font-semibold">'+timeText(Number(r.time_elapsed)||0)+'</td><td class="p-2 border">'+(Number(r.score)||0)+'</td></tr>').join('');
+    const rows=remoteLeaderboard.map(normalizeLeaderboardRow)
+      .filter(r=>r.employee_id!=='')
+      .sort((a,b)=>a.time_elapsed-b.time_elapsed || b.score-a.score).slice(0,10);
+    if(!rows.length){
+      body.innerHTML='<tr><td colspan="4" class="p-3 border text-center">ยังไม่มีข้อมูลจากระบบกลาง</td></tr>';
+      return;
+    }
+    body.innerHTML=rows.map((r,i)=>
+      '<tr class="'+(r.employee_id===player?.employee_id?'bg-yellow-50':'')+'"><td class="p-2 border font-bold">'+(i+1)+'</td><td class="p-2 border">'+escapeHTML(r.employee_id)+'</td><td class="p-2 border font-semibold">'+timeText(r.time_elapsed)+'</td><td class="p-2 border">'+r.score+'</td></tr>'
+    ).join('');
+    $('leaderboard-note').textContent='อันดับรวมจาก Google Sheets';
   }
-  function escapeHTML(value){return String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));}
+  function loadLeaderboard(){
+    $('leaderboard-note').textContent='กำลังโหลดอันดับจากระบบกลาง…';
+    const callbackName='qdLeaderboardCallback_'+Date.now();
+    window[callbackName]=data=>{
+      try{
+        remoteLeaderboard=Array.isArray(data)?data:(data.leaderboard||data.data||data.results||[]);
+        renderLeaderboard();
+        if(!remoteLeaderboard.length)$('leaderboard-note').textContent='ยังไม่มีคะแนนใน Google Sheets';
+      }catch(_){
+        $('leaderboard-note').textContent='อ่านข้อมูลอันดับไม่สำเร็จ โปรดตรวจสอบรูปแบบข้อมูลจาก Apps Script';
+      }finally{
+        delete window[callbackName];
+        script.remove();
+      }
+    };
+    const script=document.createElement('script');
+    script.src=APPS_SCRIPT_URL+'?callback='+encodeURIComponent(callbackName)+'&_='+Date.now();
+    script.onerror=()=>{
+      $('leaderboard-note').textContent='โหลดอันดับไม่สำเร็จ กรุณาตรวจสอบการเผยแพร่ Web App';
+      delete window[callbackName];
+      script.remove();
+    };
+    document.head.appendChild(script);
+  }
   function storeLocalResult(){
-    const entry={employee_id:player.employee_id,full_name:player.full_name,department:player.department,score,risks_found:risksFound,time_elapsed:remaining,result_level:$('result-level').textContent,played_at:new Date().toISOString()};
-    const all=getLeaderboard(); all.push(entry);
-    try{localStorage.setItem(LEADERBOARD_KEY,JSON.stringify(all));window._qdCurrentPlayedAt=entry.played_at;}
-    catch(_){$('leaderboard-note').textContent='เบราว์เซอร์ไม่อนุญาตให้บันทึกอันดับไว้ในเครื่องนี้';}
-    renderLeaderboard();
+    const entry={employee_id:player.employee_id,score,risks_found:risksFound,time_elapsed:remaining,result_level:$('result-level').textContent,played_at:new Date().toISOString()};
+    try{
+      const key='quality_detective_my_results_v1';
+      const all=JSON.parse(localStorage.getItem(key)||'[]');
+      all.push(entry);localStorage.setItem(key,JSON.stringify(all));
+    }catch(_){}
   }
   function exportLeaderboardCSV(){
-    const all=getLeaderboard().sort((a,b)=>a.time_elapsed-b.time_elapsed || b.score-a.score);
-    const rows=[['อันดับ','รหัสพนักงาน','เวลา (วินาที)','เวลา','คะแนน','พบจุด NG','Rank','วันที่เล่น'],...all.map((r,i)=>[i+1,r.employee_id,r.time_elapsed,timeText(Number(r.time_elapsed)||0),r.score,(r.risks_found||0)+'/7',r.result_level,r.played_at])];
+    const all=remoteLeaderboard.map(normalizeLeaderboardRow).sort((a,b)=>a.time_elapsed-b.time_elapsed || b.score-a.score);
+    const rows=[['อันดับ','รหัสพนักงาน','เวลา (วินาที)','เวลา','คะแนน','Rank','วันที่เล่น'],...all.map((r,i)=>[i+1,r.employee_id,r.time_elapsed,timeText(r.time_elapsed),r.score,r.result_level,r.played_at])];
     const csv='\uFEFF'+rows.map(row=>row.map(value=>'"'+String(value??'').replace(/"/g,'""')+'"').join(',')).join('\r\n');
-    const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='QUALITY_DETECTIVE_Leaderboard.csv';document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);
+    const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
+    const url=URL.createObjectURL(blob);const a=document.createElement('a');
+    a.href=url;a.download='QUALITY_DETECTIVE_Leaderboard.csv';
+    document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);
   }
   function finish(){
     if(ending)return;
@@ -313,10 +357,7 @@
     $('player-form').reset();$('form-error').classList.add('hidden');
     show('intro');$('employee-id').focus();
   });
-  (async()=>{
-    try{const result=await window.dataSdk.init({onDataChanged(){}});sdkReady=!!result.isOk}
-    catch(_){sdkReady=false}
-  })();
+  loadLeaderboard();
 </script>
  
 </body></html>
