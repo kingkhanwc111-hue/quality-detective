@@ -156,9 +156,18 @@
       '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
     }[ch]));
   }
-  let player=null,sceneIndex=0,found=new Set(),score=0,risksFound=0,remaining=0,timer=null,playing=false,ending=false,sdkReady=false;
+  let player=null,sceneIndex=0,found=new Set(),score=0,risksFound=0,remaining=0,timer=null,playing=false,ending=false,sdkReady=false,elapsedMs=0,segmentStartedAt=0;
   function show(view){['intro','game','summary'].forEach(id=>$(id).classList.toggle('hidden',id!==view))}
-  function timeText(n){return String(Math.floor(n/60)).padStart(2,'0')+':'+String(n%60).padStart(2,'0')}
+  function timeText(n){
+    const totalMs=Math.max(0,Math.round(Number(n||0)*1000));
+    const minutes=Math.floor(totalMs/60000);
+    const seconds=Math.floor((totalMs%60000)/1000);
+    const milliseconds=totalMs%1000;
+    return String(minutes).padStart(2,'0')+':'+String(seconds).padStart(2,'0')+'.'+String(milliseconds).padStart(3,'0');
+  }
+  function elapsedSeconds(){
+    return (elapsedMs+(playing && segmentStartedAt ? performance.now()-segmentStartedAt : 0))/1000;
+  }
   function updateStats(){
     $('score-display').textContent=score;
     $('found-display').textContent=found.size+'/'+(sceneIndex===0?3:4);
@@ -169,10 +178,25 @@
     $('feedback').textContent=text;
     $('feedback').className='mt-2 min-h-6 font-semibold '+(good?'text-green-800':'text-red-800');
   }
-  function stopTimer(){clearInterval(timer);timer=null}
+  function stopTimer(){
+    if(timer!==null){
+      clearInterval(timer);
+      timer=null;
+      if(segmentStartedAt){
+        elapsedMs+=performance.now()-segmentStartedAt;
+        segmentStartedAt=0;
+      }
+    }
+    remaining=elapsedMs/1000;
+  }
   function runTimer(){
      stopTimer();
-     timer=setInterval(()=>{if(!playing)return;remaining+=1;updateStats()},1000);
+     segmentStartedAt=performance.now();
+     timer=setInterval(()=>{
+       if(!playing)return;
+       remaining=elapsedSeconds();
+       updateStats();
+     },30);
   }
   function markPoint(i){
     if(!playing||found.has(i))return;
@@ -217,14 +241,14 @@
     updateStats();runTimer();
   }
   function start(){
-    stopTimer();sceneIndex=0;score=0;risksFound=0;remaining=0;ending=false;
+    stopTimer();sceneIndex=0;score=0;risksFound=0;remaining=0;elapsedMs=0;segmentStartedAt=0;ending=false;
     $('player-display').textContent='รหัสพนักงาน: '+player.employee_id;
     show('game');loadScene();
   }
   async function saveResult(){
     const status=$('save-status');
     status.textContent='กำลังส่งผลคะแนนไปยังระบบกลาง…';
-    const payload={employeeId:player.employee_id,score:score,timeSeconds:remaining,rank:$('result-level').textContent};
+    const payload={employeeId:player.employee_id,score:score,timeSeconds:elapsedSeconds(),rank:$('result-level').textContent};
     try{
       await fetch(APPS_SCRIPT_URL,{
         method:'POST',mode:'no-cors',
@@ -327,7 +351,7 @@
     document.head.appendChild(script);
   }
   function storeLocalResult(){
-    const entry={employee_id:player.employee_id,score,risks_found:risksFound,time_elapsed:remaining,result_level:$('result-level').textContent,played_at:new Date().toISOString()};
+    const entry={employee_id:player.employee_id,score,risks_found:risksFound,time_elapsed:elapsedSeconds(),result_level:$('result-level').textContent,played_at:new Date().toISOString()};
     try{
       const key='quality_detective_my_results_v1';
       const all=JSON.parse(localStorage.getItem(key)||'[]');
@@ -345,7 +369,7 @@
   }
   function finish(){
     if(ending)return;
-    ending=true;playing=false;stopTimer();
+    ending=true;playing=false;stopTimer();remaining=elapsedMs/1000;
     const rank = score >= 60 ? 'S RANK — Quality Master'
                : score >= 40 ? 'A RANK — Quality Expert'
                : score >= 20 ? 'B RANK — Quality Detective'
