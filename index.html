@@ -249,7 +249,7 @@
   async function saveResult(){
     const status=$('save-status');
     status.textContent='กำลังส่งผลคะแนนไปยังระบบกลาง…';
-    const payload={employeeId:player.employee_id,score:score,timeSeconds:elapsedSeconds(),rank:$('result-level').textContent};
+   const payload={employeeId:player.employee_id,score:score,timeSeconds:elapsedSeconds(),rank:$('result-level').textContent};
     try{
       await fetch(APPS_SCRIPT_URL,{
         method:'POST',mode:'no-cors',
