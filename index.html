@@ -1,4 +1,4 @@
-timeSeconds:remaining<!doctype html>
+<!doctype html>
 <html lang="th"><head><script>window["__codeletBootstrap__"]=JSON.parse('{"A":"A","B":"20261020-05-fc6d5d4","C":{"Abril Fatface":"YACgEZbkUVE,0","Albert Sans":"YAHO2HRfeh4,0","Alfa Slab One":"YACgEYS9sJU,0","Anton":"YACgEcYqQ-A,0","Archivo Black":"YACgEZulLoA,0","Archivo":"YAHO2-t-jNE,0","Arial":"YAGyDvJ_4Ts,0","Baloo 2":"YAHO2IcQUcM,0","Barlow Condensed":"YAFdJljEuFc,0","Barlow":"YAFdJsyuOPM,1","Bebas Neue":"YACgESME5ew,0","Bricolage Grotesque":"YAFyMcdwzpc,0","Cairo":"YAFdtXpDzlQ,0","Canva Sans":"YAFdJjTk5UU,1","Caveat":"YALBs2ploWQ,0","Cinzel":"YACgEeV8bIQ,0","Cormorant Garamond":"YAFdJhX-538,0","Courier New":"YAGzXiGs0_8,0","Courier Prime":"YAD1aFjegN8,0","DM Sans":"YAD1aU3sLnI,0","DM Serif Display":"YAD1aYG82rc,0","Figtree":"YAHO2b-mV7A,0","Forum":"YACgEcnnqB4,0","Fraunces":"YAFdJpU7Kkk,0","Fredoka":"YACgEZml080,0","Georgia":"YAGzXkO0pEM,0","Hanken Grotesk":"YAHO2VB9G0I,0","Helvetica":"YAFcf7zkXN0,0","IBM Plex Mono":"YAFdJkmvhGI,0","IBM Plex Sans":"YAFdJgT0SHI,0","Impact":"YAFcfnjI7Vk,0","Instrument Sans":"YAHO2bKyaSQ,0","Instrument Serif":"YAHFeOnZNEk,0","Inter":"YAFdJvSyp_k,3","Italiana":"YAHO2Toik_w,0","Jacques Francois":"YAHO2a5g66Q,0","JetBrains Mono":"YAFdJksXcAk,0","Josefin Sans":"YAFdJjvw9Ps,0","Karla":"YAHO2V2NSXM,0","Lato":"YAFdJuFCnaw,0","Libre Baskerville":"YACgEUFdPdA,0","Libre Caslon Display":"YAHO2XhLmt0,0","Lobster":"YAD8SnSjSFI,0","Lora":"YACgEXvxf8Q,0","Manrope":"YAHO2b2feC4,0","Merriweather":"YACgEXvHxxs,0","Montserrat":"YAFdtQi73Xs,0","Noto Sans JP":"YAFdJiHXlcI,0","Noto Sans KR":"YAGsojZj-RQ,0","Nunito Sans":"YAFdtQJYB9w,1","Nunito":"YAFdJoNRMmU,1","Oleo Script":"YACgEQQ14jI,0","Open Sans":"YAFdJt8dAY0,1","Oswald":"YACgEQY10lw,0","Outfit":"YAHO2nVlg14,0","Pacifico":"YADLjORQ1u4,0","Playfair Display":"YAFdJhem5V8,1","Plus Jakarta Sans":"YAHO2gdhi18,0","Poppins":"YAFdJjbTu24,1","Press Start 2P":"YAFyGr-8pmQ,0","Public Sans":"YAFdJj8NdaU,1","Quicksand":"YAFdJpYtCxE,1","Raleway":"YAFdJhmxbVQ,1","Roboto Slab":"YAFdJswIKAg,0","Rockwell":"YAFcfyVZnN0,0","Rye":"YACgEdQP21k,0","STIX Two Text":"YAHO2joycuk,0","Sarabun":"YAFdJssSnME,0","Schibsted Grotesk":"YAHO2sWydRk,0","Segoe UI":"YAHNdRD1Klw,0","Source Sans 3":"YAG4lO1Mj10,0","Space Grotesk":"YAHO2sjPCSM,0","Space Mono":"YADW1-vpsoc,0","Spectral":"YAHO2rVUHIM,0","Times New Roman":"YAGzXW3gftg,0","Trebuchet MS":"YAFcfrglpVA,0","Ubuntu":"YACgERDU--Q,0","Verdana":"YAGzXTctYtQ,0","Work Sans":"YAGXhLOKv44,0","Yellowtail":"YACgEYG4kG4,0"}}');</script><script src="/_sdk/05db820ba1544614.telemetry_sdk.js" integrity="sha512-a7JzkQDDcioSXpM61nxTfeRW7PcxWQy5+BrhyeTFmQFsXJ+Gncm0y50u7fTA7qOPegFnRgqCfa0mGUOK1yjDWQ=="></script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -158,15 +158,16 @@ timeSeconds:remaining<!doctype html>
   }
   let player=null,sceneIndex=0,found=new Set(),score=0,risksFound=0,remaining=0,timer=null,playing=false,ending=false,sdkReady=false,elapsedMs=0,segmentStartedAt=0;
   function show(view){['intro','game','summary'].forEach(id=>$(id).classList.toggle('hidden',id!==view))}
-  function timeText(n){
-    const totalMs=Math.max(0,Math.round(Number(n||0)*1000));
+  function timeText(seconds){
+    const totalMs=Math.max(0,Math.round(Number(seconds||0)*1000));
     const minutes=Math.floor(totalMs/60000);
-    const seconds=Math.floor((totalMs%60000)/1000);
-    const milliseconds=totalMs%1000;
-    return String(minutes).padStart(2,'0')+':'+String(seconds).padStart(2,'0')+'.'+String(milliseconds).padStart(3,'0');
+    const secs=Math.floor((totalMs%60000)/1000);
+    const millis=totalMs%1000;
+    return String(minutes).padStart(2,'0')+':'+String(secs).padStart(2,'0')+'.'+String(millis).padStart(3,'0');
   }
   function elapsedSeconds(){
-    return (elapsedMs+(playing && segmentStartedAt ? performance.now()-segmentStartedAt : 0))/1000;
+    const liveMs=segmentStartedAt ? performance.now()-segmentStartedAt : 0;
+    return (elapsedMs+liveMs)/1000;
   }
   function updateStats(){
     $('score-display').textContent=score;
@@ -190,13 +191,13 @@ timeSeconds:remaining<!doctype html>
     remaining=elapsedMs/1000;
   }
   function runTimer(){
-     stopTimer();
-     segmentStartedAt=performance.now();
-     timer=setInterval(()=>{
-       if(!playing)return;
-       remaining=elapsedSeconds();
-       updateStats();
-     },30);
+    stopTimer();
+    segmentStartedAt=performance.now();
+    timer=setInterval(()=>{
+      if(!playing)return;
+      remaining=elapsedSeconds();
+      updateStats();
+    },30);
   }
   function markPoint(i){
     if(!playing||found.has(i))return;
@@ -351,7 +352,7 @@ timeSeconds:remaining<!doctype html>
     document.head.appendChild(script);
   }
   function storeLocalResult(){
-    const entry={employee_id:player.employee_id,score,risks_found:risksFound,time_elapsed:elapsedSeconds(),result_level:$('result-level').textContent,played_at:new Date().toISOString()};
+    const entry={employee_id:player.employee_id,score,risks_found:risksFound,time_elapsed:elapsedMs/1000,result_level:$('result-level').textContent,played_at:new Date().toISOString()};
     try{
       const key='quality_detective_my_results_v1';
       const all=JSON.parse(localStorage.getItem(key)||'[]');
